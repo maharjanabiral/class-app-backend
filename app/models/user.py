@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, func
+from sqlalchemy import Boolean, Column, Integer, String, Enum, DateTime, func
+from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
 
@@ -17,5 +18,20 @@ class User(Base):
     email = Column(String(150), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(Role), nullable=False)
-    is_active = Column(Integer, default=1)
-    created_at = Column(DateTime, server_default=func.now())
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    student = relationship(
+                "Student",
+                back_populates="user",
+                uselist=False,
+                cascade="all, delete-orphan"
+            )
+
+    teacher = relationship(
+                "Teacher",
+                back_populates="user",
+                uselist=False,
+                cascade="all, delete-orphan"
+            )
