@@ -7,9 +7,9 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.4",
     "asyncpg>=0.31.0",
+    "bcrypt>=5.0.0",
     "fastapi>=0.136.3",
     "fastapi-mail>=1.6.4",
-    "passlib[bcrypt]>=1.7.4",
     "pydantic-settings>=2.14.1",
     "pyotp>=2.9.0",
     "python-jose[cryptography]>=3.5.0",

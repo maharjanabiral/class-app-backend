@@ -3,7 +3,7 @@ uvicorn[standard]
 sqlalchemy
 alembic
 pydantic-settings
-passlib[bcrypt]
+bcrypt
 python-jose[cryptography]
 pyotp
 fastapi-mail
