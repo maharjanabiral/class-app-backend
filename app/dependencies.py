@@ -5,8 +5,10 @@ from sqlalchemy.future import select
 from app.database import get_db
 from app.models.user import User
 from app.core.security import decode_token
+from app.models.user import Role
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
     payload = decode_token(token)
@@ -19,14 +21,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
-def require_role(*roles):
+
+def require_role(*roles: Role):
     async def checker(current_user: User = Depends(get_current_user)):
         if current_user.role not in roles:
-            raise HTTPException(status_code=403, detail="Access forbidden")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access forbidden")
         return current_user
     return checker
 
+
 # Convenience deps
-get_current_student = require_role("student")
-get_current_teacher = require_role("teacher")
-get_current_admin   = require_role("admin")
+get_current_student = require_role(Role.student)
+get_current_teacher = require_role(Role.teacher)
+get_current_admin = require_role(Role.admin)
+get_current_staff = require_role(
+            Role.admin,
+            Role.teacher
+        )
