@@ -2,6 +2,7 @@
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_admin
@@ -14,7 +15,7 @@ from app.schemas.teacher import (
     TeacherUpdate,
 )
 
-router = APIRouter()  # no prefix here — admin.py will mount it with a prefix
+router = APIRouter()
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 AdminUser = Annotated[None, Depends(get_current_admin)]
@@ -36,7 +37,9 @@ async def create_teacher_account(data: TeacherCreate, db: DBSession, _: AdminUse
     summary="Get all teachers"
 )
 async def get_all_teachers(db: DBSession, _: AdminUser):
-    result = await db.execute(select(Teacher).join(Teacher.user))
+    result = await db.execute(
+        select(Teacher).options(joinedload(Teacher.user))
+    )
     return result.scalars().all()
 
 
@@ -46,7 +49,11 @@ async def get_all_teachers(db: DBSession, _: AdminUser):
     summary="Get a teacher by teacher_id"
 )
 async def get_teacher(teacher_id: str, db: DBSession, _: AdminUser):
-    result = await db.execute(select(Teacher).filter(Teacher.teacher_id == teacher_id))
+    result = await db.execute(
+        select(Teacher)
+        .options(joinedload(Teacher.user))
+        .filter(Teacher.teacher_id == teacher_id)
+    )
     teacher = result.scalar_one_or_none()
     if not teacher:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
@@ -59,12 +66,16 @@ async def get_teacher(teacher_id: str, db: DBSession, _: AdminUser):
     summary="Update a teacher"
 )
 async def update_teacher(teacher_id: str, data: TeacherUpdate, db: DBSession, _: AdminUser):
-    result = await db.execute(select(Teacher).filter(Teacher.teacher_id == teacher_id))
+    result = await db.execute(
+        select(Teacher)
+        .options(joinedload(Teacher.user))
+        .filter(Teacher.teacher_id == teacher_id)
+    )
     teacher = result.scalar_one_or_none()
     if not teacher:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-    for field in ("department", "designation", "phone"):
+    for field in ("department", "phone"):
         value = getattr(data, field, None)
         if value is not None:
             setattr(teacher, field, value)
@@ -85,7 +96,11 @@ async def update_teacher(teacher_id: str, data: TeacherUpdate, db: DBSession, _:
     summary="Delete a teacher account"
 )
 async def delete_teacher(teacher_id: str, db: DBSession, _: AdminUser):
-    result = await db.execute(select(Teacher).filter(Teacher.teacher_id == teacher_id))
+    result = await db.execute(
+        select(Teacher)
+        .options(joinedload(Teacher.user))
+        .filter(Teacher.teacher_id == teacher_id)
+    )
     teacher = result.scalar_one_or_none()
     if not teacher:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
