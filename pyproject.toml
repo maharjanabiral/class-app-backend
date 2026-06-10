@@ -19,3 +19,9 @@ dependencies = [
     "sqlalchemy>=2.0.50",
     "uvicorn[standard]>=0.49.0",
 ]
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]

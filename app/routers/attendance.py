@@ -1,4 +1,5 @@
 import io
+# pyrefly: ignore [untyped-import]
 import qrcode
 from typing import Annotated, List
 
@@ -117,6 +118,7 @@ async def generate_session_qr(
             )
 
     # Generate QR token (expires in 2 minutes / 120 seconds)
+    # pyrefly: ignore [bad-argument-type]
     token = create_qr_token(session.id, expires_delta_seconds=120)
 
     # Generate QR Code Image
@@ -126,6 +128,7 @@ async def generate_session_qr(
     img = qr.make_image(fill_color="black", back_color="white")
 
     buf = io.BytesIO()
+    # pyrefly: ignore [unexpected-keyword]
     img.save(buf, format="PNG")
     buf.seek(0)
 

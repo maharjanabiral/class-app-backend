@@ -32,6 +32,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
+    # pyrefly: ignore [bad-argument-type]
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
