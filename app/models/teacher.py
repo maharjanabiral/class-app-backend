@@ -19,6 +19,7 @@ class Teacher(Base):
     phone = Column(String(10))
     department = Column(String(20))
     user = relationship("User", back_populates="teacher")
+    courses = relationship("Course", back_populates="teacher")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

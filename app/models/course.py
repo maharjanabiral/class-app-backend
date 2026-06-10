@@ -39,3 +39,10 @@ class Course(Base):
         "Teacher",
         back_populates="courses"
     )
+
+    sessions = relationship(
+        "ClassSession",
+        back_populates="course",
+        cascade="all, delete-orphan"
+    )
+

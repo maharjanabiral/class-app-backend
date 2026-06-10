@@ -20,3 +20,21 @@ def decode_token(token: str) -> dict:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
         return None
+
+def create_qr_token(session_id: int, expires_delta_seconds: int = 120) -> str:
+    to_encode = {
+        "sub": str(session_id),
+        "type": "attendance_qr",
+        "exp": datetime.utcnow() + timedelta(seconds=expires_delta_seconds)
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def decode_qr_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "attendance_qr":
+            return None
+        return payload
+    except JWTError:
+        return None
+
