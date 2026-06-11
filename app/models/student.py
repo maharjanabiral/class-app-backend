@@ -16,16 +16,16 @@ class Student(Base):
                 nullable=False
             )
 
-    # class_id = Column(
-    #             Integer,
-    #             ForeignKey("classes.id", ondelete="CASCADE")
-    #         )
+    classroom_id = Column(
+                Integer,
+                ForeignKey("classrooms.id", ondelete="CASCADE")
+            )
 
     roll_no = Column(String(50), unique=True)
     phone = Column(String(10))
     user = relationship("User", back_populates="student")
 
-    # classroom = relationship("Classroom", back_populates="students")
+    classroom = relationship("Classroom", back_populates="students")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

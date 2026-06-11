@@ -1,4 +1,3 @@
-# app/routers/teacher.py
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select

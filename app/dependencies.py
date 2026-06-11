@@ -1,5 +1,4 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
@@ -7,8 +6,11 @@ from app.models.user import User
 from app.core.security import decode_token
 from app.models.user import Role
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.models.teacher import Teacher
+from app.models.student import Student
 
 http_bearer = HTTPBearer()
+
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
@@ -33,9 +35,40 @@ def require_role(*roles: Role):
     return checker
 
 
+async def get_teacher_profile(
+    current_user: User = Depends(require_role(Role.teacher)),
+    db: AsyncSession = Depends(get_db)
+) -> Teacher:
+
+    result = await db.execute(
+        select(Teacher).where(Teacher.user_id == current_user.id)
+    )
+
+    teacher = result.scalar_one_or_none()
+
+    if not teacher:
+        raise HTTPException(403, "Teacher profile missing")
+
+    return teacher
+
+
+async def get_student_profile(
+    current_user: User = Depends(require_role(Role.student)),
+    db: AsyncSession = Depends(get_db)
+) -> Student:
+
+    result = await db.execute(
+        select(Student).where(Student.user_id == current_user.id)
+    )
+
+    student = result.scalar_one_or_none()
+
+    if not student:
+        raise HTTPException(403, "Student profile missing")
+
+    return student
+
 # Convenience deps
-get_current_student = require_role(Role.student)
-get_current_teacher = require_role(Role.teacher)
 get_current_admin = require_role(Role.admin)
 get_current_staff = require_role(
             Role.admin,
