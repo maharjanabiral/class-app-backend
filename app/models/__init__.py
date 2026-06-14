@@ -18,3 +18,4 @@ __all__ = [
     "ClassSession",
     "AttendanceRecord",
 ]
+

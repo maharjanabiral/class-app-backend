@@ -8,7 +8,7 @@ class Teacher(Base):
     __tablename__ = "teachers"
 
     id = Column(Integer, primary_key=True)
-
+    teacher_id = Column(String(20), unique=True, index=False, nullable=False)
     user_id = Column(
                 Integer,
                 ForeignKey("users.id", ondelete="CASCADE"),
