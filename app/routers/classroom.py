@@ -105,7 +105,7 @@ async def get_classroom_detail(
         )
         .where(Classroom.id == classroom_id)
     )
-    classroom = result.scalar_one_or_none()
+    classroom = result.unique().scalar_one_or_none()
     if not classroom:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
 
@@ -213,13 +213,13 @@ async def enroll_student(
     if not student:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
-    if student.class_id == classroom_id:
+    if student.classroom_id == classroom_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Student is already enrolled in this classroom",
         )
 
-    student.class_id = classroom_id
+    student.classroom_id = classroom_id
     if data.roll_no is not None:
         student.roll_no = data.roll_no
 
@@ -252,7 +252,7 @@ async def remove_student(
     result = await db.execute(
         select(Student).where(
             Student.student_id == student_id,
-            Student.class_id == classroom_id,
+            Student.classroom_id == classroom_id,
         )
     )
     student = result.scalar_one_or_none()
@@ -262,7 +262,7 @@ async def remove_student(
             detail="Student not found in this classroom",
         )
 
-    student.class_id = None
+    student.classroom_id = None
     await db.commit()
 
 
@@ -291,7 +291,7 @@ async def list_classroom_students(
     result = await db.execute(
         select(Student)
         .options(joinedload(Student.user))
-        .where(Student.class_id == classroom_id)
+        .where(Student.classroom_id == classroom_id)
     )
     students = result.scalars().all()
     return [
@@ -330,7 +330,7 @@ async def list_classroom_courses(
     result = await db.execute(
         select(Course)
         .options(joinedload(Course.teacher).joinedload(Teacher.user))
-        .where(Course.class_id == classroom_id)
+        .where(Course.classroom_id == classroom_id)
     )
     courses = result.scalars().all()
     return [
@@ -362,7 +362,7 @@ async def list_classroom_sessions(
 
     # Get course_ids that belong to this classroom
     courses_result = await db.execute(
-        select(Course.id).where(Course.class_id == classroom_id)
+        select(Course.id).where(Course.classroom_id == classroom_id)
     )
     course_ids = [row[0] for row in courses_result.all()]
 
@@ -373,7 +373,7 @@ async def list_classroom_sessions(
         # Only show sessions from this teacher's courses in the classroom
         teacher_courses = await db.execute(
             select(Course.id).where(
-                Course.class_id == classroom_id,
+                Course.classroom_id == classroom_id,
                 Course.teacher_id == teacher.id,
             )
         )

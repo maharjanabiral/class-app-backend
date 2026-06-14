@@ -20,9 +20,9 @@ class Course(Base):
         nullable=False
     )
 
-    class_id = Column(
+    classroom_id = Column(
         Integer,
-        ForeignKey("classes.id")
+        ForeignKey("classroom.id")
     )
 
     teacher_id = Column(

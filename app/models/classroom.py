@@ -5,7 +5,7 @@ from app.database import Base
 
 
 class Classroom(Base):
-    __tablename__ = "classes"
+    __tablename__ = "classroom"
 
     id = Column(Integer, primary_key=True)
 

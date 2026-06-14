@@ -16,9 +16,9 @@ class Student(Base):
                 nullable=False
             )
 
-    class_id = Column(
+    classroom_id = Column(
                 Integer,
-                ForeignKey("classes.id", ondelete="CASCADE"),
+                ForeignKey("classroom.id", ondelete="CASCADE"),
                 nullable=True
             )
 
