@@ -18,6 +18,9 @@ dependencies = [
     "qrcode[pil]>=8.2",
     "sqlalchemy>=2.0.50",
     "uvicorn[standard]>=0.49.0",
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+    "httpx>=0.28.1",
 ]
 
 [tool.pyrefly]

@@ -26,7 +26,7 @@ class ConnectionManager:
                 conns.remove(websocket)
 
     async def broadcast(self, message: dict, target_role: str):
-        targets = self.active_connections.get(target_role, [])
+        targets = list(self.active_connections.get(target_role, []))  # snapshot
         dead = []
         for ws in targets:
             try:
@@ -34,7 +34,9 @@ class ConnectionManager:
             except Exception:
                 dead.append(ws)
         for ws in dead:
-            if ws in targets:
-                targets.remove(ws)
+            for conns in self.active_connections.values():
+                if ws in conns:
+                    conns.remove(ws)
+
 
 manager = ConnectionManager()
