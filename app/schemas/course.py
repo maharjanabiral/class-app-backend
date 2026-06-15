@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 
 class CourseCreate(BaseModel):
@@ -13,6 +13,10 @@ class CourseUpdate(BaseModel):
     course_name: Optional[str] = None
     class_id: Optional[int] = None
     teacher_id: Optional[int] = None
+
+
+class EnrollStudentsInCourseRequest(BaseModel):
+    student_ids: List[str]  # login_ids like STU001
 
 
 class TeacherBrief(BaseModel):

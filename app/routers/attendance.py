@@ -275,7 +275,7 @@ async def mark_attendance(
         )
 
     # Verify student belongs to the classroom/course
-    if student.class_id != course.class_id:
+    if student.classroom_id != course.classroom_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Student does not belong to the class assigned to this course"

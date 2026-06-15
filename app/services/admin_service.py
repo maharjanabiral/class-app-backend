@@ -1,5 +1,7 @@
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
 from app.models.user import User, Role
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -118,7 +120,39 @@ async def assign_course_to_classroom(
             )
         course.teacher_id = teacher_id  # type: ignore
 
-    course.class_id = classroom_id  # type: ignore
+    course.classroom_id = classroom_id  # type: ignore
     await db.commit()
     await db.refresh(course)
     return course
+
+
+async def enroll_students_in_course(
+    db: AsyncSession,
+    course_id: int,
+    student_login_ids: List[str]
+) -> List[Student]:
+    # Fetch course with current students
+    result = await db.execute(
+        select(Course).options(joinedload(Course.students)).where(Course.id == course_id)
+    )
+    course = result.unique().scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    # Fetch students by login_id
+    student_result = await db.execute(
+        select(Student).where(Student.student_id.in_(student_login_ids))
+    )
+    students = student_result.scalars().all()
+
+    if len(students) != len(student_login_ids):
+        found = {s.student_id for s in students}
+        missing = [sid for sid in student_login_ids if sid not in found]
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Students not found: {missing}"
+        )
+
+    course.students.extend([s for s in students if s not in course.students])
+    await db.commit()
+    return course.students

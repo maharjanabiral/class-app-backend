@@ -16,9 +16,11 @@ from app.schemas.course import (
     CourseUpdate,
     CourseResponse,
     CourseDetailResponse,
+    EnrollStudentsInCourseRequest,
     TeacherBrief,
     ClassroomBrief,
 )
+from app.services.admin_service import enroll_students_in_course
 
 router = APIRouter(prefix="/course", tags=["Courses"])
 
@@ -198,3 +200,17 @@ async def delete_course(
 
     await db.delete(course)
     await db.commit()
+
+
+@router.post(
+    "/{course_id}/enroll-students",
+    summary="Enroll multiple students into a course (Admin only)",
+)
+async def enroll_students(
+    course_id: int,
+    data: EnrollStudentsInCourseRequest,
+    db: DBSession,
+    _=Depends(get_current_admin),
+):
+    await enroll_students_in_course(db, course_id, data.student_ids)
+    return {"message": f"Successfully enrolled {len(data.student_ids)} students"}

@@ -84,13 +84,13 @@ async def get_my_classroom(
 ):
     student = await _get_student(current_user, db)
 
-    if not student.class_id:
+    if not student.classroom_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="You have not been assigned to a classroom yet",
         )
 
-    classroom = await db.get(Classroom, student.class_id)
+    classroom = await db.get(Classroom, student.classroom_id)
     if not classroom:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
 
@@ -108,7 +108,7 @@ async def get_my_courses(
 ):
     student = await _get_student(current_user, db)
 
-    if not student.class_id:
+    if not student.classroom_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="You have not been assigned to a classroom yet",
@@ -117,7 +117,7 @@ async def get_my_courses(
     result = await db.execute(
         select(Course)
         .options(joinedload(Course.teacher).joinedload(Teacher.user))
-        .where(Course.class_id == student.class_id)
+        .where(Course.classroom_id == student.classroom_id)
     )
     courses = result.scalars().all()
     return [

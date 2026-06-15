@@ -1,7 +1,15 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Table
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+course_students = Table(
+    "course_students",
+    Base.metadata,
+    Column("course_id", Integer, ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True),
+    Column("student_id", Integer, ForeignKey("students.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Course(Base):
@@ -44,4 +52,10 @@ class Course(Base):
         "ClassSession",
         back_populates="course",
         cascade="all, delete-orphan"
+    )
+
+    students = relationship(
+        "Student",
+        secondary=course_students,
+        back_populates="courses"
     )

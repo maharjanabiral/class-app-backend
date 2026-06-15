@@ -43,7 +43,7 @@ async def _get_teacher(user_id: int, db: AsyncSession) -> Teacher:
 async def _verify_teacher_classroom_access(teacher_id: int, classroom_id: int, db: AsyncSession):
     course_check = await db.execute(
         select(Course).where(
-            Course.class_id == classroom_id,
+            Course.classroom_id == classroom_id,
             Course.teacher_id == teacher_id,
         )
     )
