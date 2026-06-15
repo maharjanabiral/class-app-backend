@@ -22,7 +22,7 @@ class Course(Base):
 
     classroom_id = Column(
         Integer,
-        ForeignKey("classroom.id")
+        ForeignKey("classrooms.id")
     )
 
     teacher_id = Column(

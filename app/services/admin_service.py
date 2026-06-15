@@ -6,6 +6,9 @@ from app.models.teacher import Teacher
 from app.schemas.student import StudentCreate
 from app.schemas.teacher import TeacherCreate
 from app.core.security import generate_default_password, hash_password
+from app.models.course import Course
+from app.models.classroom import Classroom
+from fastapi import HTTPException, status
 
 
 async def _generate_login_id(db: AsyncSession, role: Role) -> str:
@@ -16,7 +19,7 @@ async def _generate_login_id(db: AsyncSession, role: Role) -> str:
         prefix = "TCH"
         result = await db.execute(select(func.count()).select_from(Teacher))
 
-    count = result.scalar()
+    count = result.scalar() or 0
     return f"{prefix}{str(count + 1).zfill(3)}"
 
 
@@ -40,6 +43,7 @@ async def create_student(db: AsyncSession, data: StudentCreate) -> dict:
         student_id=login_id,
         user_id=user.id,
         phone=data.phone,
+        roll_no=data.roll_no,
     )
     db.add(student)
     await db.commit()
@@ -85,3 +89,36 @@ async def create_teacher(db: AsyncSession, data: TeacherCreate) -> dict:
         "default_password": default_password,
         "user": user,
     }
+
+
+async def assign_course_to_classroom(
+    db: AsyncSession,
+    course_id: int,
+    classroom_id: int,
+    teacher_id: int | None = None) -> Course:
+    classroom = await db.get(Classroom, classroom_id)
+    if not classroom:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Classroom not found"
+        )
+    course = await db.get(Course, course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if teacher_id is not None:
+        teacher = await db.get(Teacher, teacher_id)
+        if not teacher:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Teacher not found"
+            )
+        course.teacher_id = teacher_id  # type: ignore
+
+    course.class_id = classroom_id  # type: ignore
+    await db.commit()
+    await db.refresh(course)
+    return course

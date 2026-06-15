@@ -169,7 +169,7 @@ async def update_course(
         classroom = await db.get(Classroom, data.class_id)
         if not classroom:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
-        course.class_id = data.class_id
+        course.classroom_id = data.class_id
 
     if data.teacher_id is not None:
         teacher = await db.get(Teacher, data.teacher_id)

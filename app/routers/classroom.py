@@ -1,6 +1,6 @@
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,10 +19,13 @@ from app.schemas.classroom import (
     ClassroomResponse,
     ClassroomDetail,
     EnrollStudentWithRollRequest,
+    AssignCourseRequest,
     StudentInClassroom,
     CourseInClassroom,
 )
 from app.schemas.attendance import ClassSessionResponse
+from app.schemas.course import CourseResponse
+from app.services.admin_service import assign_course_to_classroom
 
 router = APIRouter(prefix="/classroom", tags=["Classrooms"])
 
@@ -383,3 +386,17 @@ async def list_classroom_sessions(
         select(ClassSession).where(ClassSession.course_id.in_(course_ids))
     )
     return sessions_result.scalars().all()
+
+
+@router.post(
+    "/{classroom_id}/assign-course",
+    response_model=CourseResponse,
+    summary="Assign a course and a teacher to a classroom (Admin only)",
+)
+async def assign_course(
+    classroom_id: int,
+    data: AssignCourseRequest,
+    db: DBSession,
+    _=Depends(get_current_admin),
+):
+    return await assign_course_to_classroom(db, data.course_id, classroom_id, data.teacher_id)

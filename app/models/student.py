@@ -18,7 +18,7 @@ class Student(Base):
 
     classroom_id = Column(
                 Integer,
-                ForeignKey("classroom.id", ondelete="CASCADE"),
+                ForeignKey("classrooms.id", ondelete="CASCADE"),
                 nullable=True
             )
 

@@ -33,6 +33,11 @@ class EnrollStudentWithRollRequest(BaseModel):
     roll_no: Optional[str] = None
 
 
+class AssignCourseRequest(BaseModel):
+    course_id: int
+    teacher_id: Optional[int] = None
+
+
 class StudentInClassroom(BaseModel):
     id: int
     student_id: str
