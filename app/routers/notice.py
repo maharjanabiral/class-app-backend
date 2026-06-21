@@ -71,7 +71,6 @@ async def list_notices(
 ):
     result = await db.execute(
         select(Notice)
-        .where(Notice.is_active == True)
         .order_by(Notice.created_at.desc())
     )
     return result.scalars().all()
@@ -93,4 +92,21 @@ async def deactivate_notice(
     if not notice:
         raise HTTPException(status_code=404, detail="Notice not found")
     notice.is_active = False
+    await db.commit()
+
+
+@router.delete(
+    "/{notice_id}/delete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Permanently delete a notice (Admin only)",
+)
+async def delete_notice(
+    notice_id: int,
+    db: DBSession,
+    _=Depends(get_current_admin),
+):
+    notice = await db.get(Notice, notice_id)
+    if not notice:
+        raise HTTPException(status_code=404, detail="Notice not found")
+    await db.delete(notice)
     await db.commit()

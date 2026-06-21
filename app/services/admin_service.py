@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
 from app.models.user import User, Role
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -96,12 +97,14 @@ async def assign_course_to_classroom(
     course_id: int,
     classroom_id: int,
     teacher_id: int | None = None) -> Course:
+
     classroom = await db.get(Classroom, classroom_id)
     if not classroom:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Classroom not found"
         )
+
     course = await db.get(Course, course_id)
     if not course:
         raise HTTPException(
@@ -110,15 +113,25 @@ async def assign_course_to_classroom(
         )
 
     if teacher_id is not None:
-        teacher = await db.get(Teacher, teacher_id)
+        result = await db.execute(
+            select(Teacher)
+            .options(joinedload(Teacher.user))
+            .where(Teacher.id == teacher_id)
+        )
+        teacher = result.scalar_one_or_none()
         if not teacher:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Teacher not found"
             )
-        course.teacher_id = teacher_id  # type: ignore
+        if not teacher.user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot assign an inactive teacher"
+            )
+        course.teacher_id = teacher_id
 
-    course.class_id = classroom_id  # type: ignore
+    course.classroom_id = classroom_id
     await db.commit()
     await db.refresh(course)
     return course

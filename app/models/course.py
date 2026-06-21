@@ -22,12 +22,14 @@ class Course(Base):
 
     classroom_id = Column(
         Integer,
-        ForeignKey("classrooms.id")
+        ForeignKey("classrooms.id"),
+        nullable=True
     )
 
     teacher_id = Column(
         Integer,
-        ForeignKey("teachers.id")
+        ForeignKey("teachers.id"),
+        nullable=True
     )
 
     classroom = relationship(
@@ -45,3 +47,5 @@ class Course(Base):
         back_populates="course",
         cascade="all, delete-orphan"
     )
+
+    notes = relationship("Note", back_populates="course", cascade="all, delete")

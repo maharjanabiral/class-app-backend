@@ -20,7 +20,7 @@ from app.schemas.course import (
     ClassroomBrief,
 )
 
-router = APIRouter(prefix="/course", tags=["Courses"])
+router = APIRouter()
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -63,16 +63,16 @@ async def create_course(
     _=Depends(get_current_admin),
 ):
     # Verify classroom exists
-    classroom = await db.get(Classroom, data.class_id)
-    if not classroom:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
-
-    # Verify teacher exists if provided
-    if data.teacher_id is not None:
-        teacher = await db.get(Teacher, data.teacher_id)
-        if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
-
+    # classroom = await db.get(Classroom, data.class_id)
+    # if not classroom:
+    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
+    #
+    # # Verify teacher exists if provided
+    # if data.teacher_id is not None:
+    #     teacher = await db.get(Teacher, data.teacher_id)
+    #     if not teacher:
+    #         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    #
     # Ensure course_code is unique
     existing = await db.execute(select(Course).where(Course.course_code == data.course_code))
     if existing.scalar_one_or_none():
@@ -84,8 +84,6 @@ async def create_course(
     course = Course(
         course_code=data.course_code,
         course_name=data.course_name,
-        class_id=data.class_id,
-        teacher_id=data.teacher_id,
     )
     db.add(course)
     await db.commit()
@@ -165,18 +163,20 @@ async def update_course(
     if data.course_name is not None:
         course.course_name = data.course_name
 
-    if data.class_id is not None:
-        classroom = await db.get(Classroom, data.class_id)
-        if not classroom:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
-        course.classroom_id = data.class_id
-
-    if data.teacher_id is not None:
-        teacher = await db.get(Teacher, data.teacher_id)
-        if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
-        course.teacher_id = data.teacher_id
-
+    # if data.class_id is not None:
+    #     classroom = await db.get(Classroom, data.class_id)
+    #     if not classroom:
+    #         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
+    #     course.classroom_id = data.class_id
+    #
+    # if data.teacher_id is not None:
+    #     teacher = await db.get(Teacher, data.teacher_id)
+    #     if not teacher:
+    #         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    #     course.teacher_id = data.teacher_id
+    #
+    if data.course_code is not None:
+        course.course_code = data.course_code
     await db.commit()
     await db.refresh(course)
     return course

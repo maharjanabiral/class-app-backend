@@ -6,6 +6,7 @@ from app.models.teacher import Teacher
 from app.models.course import Course
 from app.models.class_session import ClassSession
 from app.models.attendance_record import AttendanceRecord
+from app.models.note import Note
 
 __all__ = [
     "Base",
@@ -17,5 +18,6 @@ __all__ = [
     "Course",
     "ClassSession",
     "AttendanceRecord",
+    "Note"
 ]
 

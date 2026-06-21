@@ -1,6 +1,5 @@
-from typing import Annotated, List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Annotated, List
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,11 +26,12 @@ from app.schemas.attendance import ClassSessionResponse
 from app.schemas.course import CourseResponse
 from app.services.admin_service import assign_course_to_classroom
 
-router = APIRouter(prefix="/classroom", tags=["Classrooms"])
+router = APIRouter()
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
 
 async def _get_teacher(user_id: int, db: AsyncSession) -> Teacher:
     result = await db.execute(select(Teacher).where(Teacher.user_id == user_id))
@@ -39,6 +39,7 @@ async def _get_teacher(user_id: int, db: AsyncSession) -> Teacher:
     if not teacher:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a teacher")
     return teacher
+
 
 async def _verify_teacher_classroom_access(teacher_id: int, classroom_id: int, db: AsyncSession):
     course_check = await db.execute(
@@ -222,6 +223,12 @@ async def enroll_student(
             detail="Student is already enrolled in this classroom",
         )
 
+    if not student.user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot enroll an inactive student"
+        )
+
     student.classroom_id = classroom_id
     if data.roll_no is not None:
         student.roll_no = data.roll_no
@@ -400,3 +407,21 @@ async def assign_course(
     _=Depends(get_current_admin),
 ):
     return await assign_course_to_classroom(db, data.course_id, classroom_id, data.teacher_id)
+
+
+@router.patch(
+    "/{classroom_id}/unassign-course/{course_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Unassign a course from a classroom (Admin only)",
+)
+async def unassign_course(
+    classroom_id: int,
+    course_id: int,
+    db: DBSession,
+    _=Depends(get_current_admin),
+):
+    course = await db.get(Course, course_id)
+    if not course or course.classroom_id != classroom_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found in this classroom")
+    course.classroom_id = None
+    await db.commit()

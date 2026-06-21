@@ -5,14 +5,11 @@ from typing import Optional
 class CourseCreate(BaseModel):
     course_code: str
     course_name: str
-    class_id: int
-    teacher_id: Optional[int] = None  # internal DB id of teacher
 
 
 class CourseUpdate(BaseModel):
     course_name: Optional[str] = None
-    class_id: Optional[int] = None
-    teacher_id: Optional[int] = None
+    course_code: Optional[str] = None
 
 
 class TeacherBrief(BaseModel):

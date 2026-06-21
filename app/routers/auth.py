@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
@@ -41,6 +42,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     # TODO: replace with email sending in production
     return {"message": "OTP generated", "otp": otp}
 
+
 @router.post("/verify-otp", response_model=TokenResponse)
 async def verify_otp_route(payload: OTPVerify, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == payload.email))
@@ -53,4 +55,20 @@ async def verify_otp_route(payload: OTPVerify, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
-    return {"access_token": token}
+
+    response = JSONResponse(content={"message": "Login successful", "access_token": token})
+    response.set_cookie(
+        key="token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+
+    return response
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("token", path="/")
+    return {"message": "Logged out"}

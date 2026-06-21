@@ -1,20 +1,17 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, Role
 from app.core.security import decode_token
-from app.models.user import Role
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-http_bearer = HTTPBearer()
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    token = credentials.credentials  # extracts the token from "Bearer <token>"
+    token = request.cookies.get("token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -24,7 +21,6 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
-
 def require_role(*roles: Role):
     async def checker(current_user: User = Depends(get_current_user)):
         if current_user.role not in roles:
@@ -32,12 +28,7 @@ def require_role(*roles: Role):
         return current_user
     return checker
 
-
-# Convenience deps
 get_current_student = require_role(Role.student)
 get_current_teacher = require_role(Role.teacher)
 get_current_admin = require_role(Role.admin)
-get_current_staff = require_role(
-            Role.admin,
-            Role.teacher
-        )
+get_current_staff = require_role(Role.admin, Role.teacher)
