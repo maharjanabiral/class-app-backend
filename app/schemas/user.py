@@ -23,6 +23,7 @@ class UserLogin(BaseModel):
 class OTPVerify(BaseModel):
     email: EmailStr
     otp: str
+    remember_me: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -30,11 +31,44 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class CourseOut(BaseModel):
+    id: int
+    course_name: str
+    course_code: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class ClassroomOut(BaseModel):
+    id: int
+    name: str
+    section: str | None = None
+
+    courses: list[CourseOut] = []
+
+    class Config:
+        from_attributes = True
+
+
 class UserOut(BaseModel):
     id: int
     name: str
     email: str
     role: Role
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: Role
+
+    classrooms: list[ClassroomOut] = []
+    courses: list[CourseOut] = []
 
     class Config:
         from_attributes = True

@@ -14,6 +14,7 @@ import app.models.course
 import app.models.class_session
 import app.models.attendance_record
 import app.models.notice
+import app.models.session_participant
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

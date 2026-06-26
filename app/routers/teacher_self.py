@@ -9,7 +9,7 @@ Mounted under /teacher prefix in main.py, giving:
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func, exists
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,10 +19,11 @@ from app.models.teacher import Teacher
 from app.models.course import Course
 from app.models.classroom import Classroom
 from app.models.class_session import ClassSession
+from app.models.attendance_record import AttendanceRecord
 from app.models.user import User
-from app.schemas.course import CourseDetailResponse, TeacherBrief, ClassroomBrief
+from app.schemas.course import CourseDetailResponse, TeacherBrief, ClassroomBrief, TeacherCourseDetailResponse
 from app.schemas.classroom import ClassroomResponse, StudentInClassroom
-from app.schemas.attendance import ClassSessionResponse
+from app.schemas.attendance import CourseSessionStats
 from app.models.student import Student
 
 router = APIRouter(prefix="/me", tags=["Teacher - Self Service"])
@@ -99,7 +100,7 @@ async def get_my_classrooms(
     # Distinct classrooms via courses
     result = await db.execute(
         select(Classroom)
-        .join(Course, Course.class_id == Classroom.id)
+        .join(Course, Course.classroom_id == Classroom.id)
         .where(Course.teacher_id == teacher.id)
         .distinct()
     )
@@ -119,14 +120,15 @@ async def get_my_classroom_students(
 ):
     teacher = await _get_teacher(current_user, db)
 
-    # Ensure teacher has a course in this classroom
+    # Verify teacher teaches at least one course in this classroom
     course_check = await db.execute(
         select(Course).where(
-            Course.class_id == classroom_id,
+            Course.classroom_id == classroom_id,
             Course.teacher_id == teacher.id,
         )
     )
-    if not course_check.scalar_one_or_none():
+
+    if course_check.first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not teach any course in this classroom",
@@ -135,42 +137,233 @@ async def get_my_classroom_students(
     result = await db.execute(
         select(Student)
         .options(joinedload(Student.user))
-        .where(Student.class_id == classroom_id)
+        .where(Student.classroom_id == classroom_id)
     )
+
     students = result.scalars().all()
+
     return [
         StudentInClassroom(
-            id=s.id,
-            student_id=s.student_id,
-            roll_no=s.roll_no,
-            name=s.user.name,
-            email=s.user.email,
-            is_active=s.user.is_active,
+            id=student.id,
+            student_id=student.student_id,
+            roll_no=student.roll_no,
+            name=student.user.name,
+            email=student.user.email,
+            is_active=student.user.is_active,
         )
-        for s in students
-    ]
+        for student in students
+    ]#
+# @router.get(
+#     "/courses/{course_id}/sessions",
+#     response_model=List[ClassSessionResponse],
+#     summary="List all sessions for one of the teacher's courses",
+# )
+# async def get_my_course_sessions(
+#     course_id: int,
+#     db: DBSession,
+#     current_user: User = Depends(get_current_teacher),
+# ):
+#     teacher = await _get_teacher(current_user, db)
+#
+#     # Verify teacher owns this course
+#     course = await db.get(Course, course_id)
+#     if not course:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+#     if course.teacher_id != teacher.id:
+#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access forbidden")
+#
+#     result = await db.execute(
+#         select(ClassSession).where(ClassSession.course_id == course_id)
+#     )
+#     return result.scalars().all()
 
 
 @router.get(
-    "/courses/{course_id}/sessions",
-    response_model=List[ClassSessionResponse],
-    summary="List all sessions for one of the teacher's courses",
+    "/courses/{course_id}",
+    response_model=TeacherCourseDetailResponse,
 )
-async def get_my_course_sessions(
+async def get_course_detail(
     course_id: int,
     db: DBSession,
     current_user: User = Depends(get_current_teacher),
 ):
     teacher = await _get_teacher(current_user, db)
 
-    # Verify teacher owns this course
-    course = await db.get(Course, course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    if course.teacher_id != teacher.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access forbidden")
-
-    result = await db.execute(
-        select(ClassSession).where(ClassSession.course_id == course_id)
+    course_result = await db.execute(
+        select(Course)
+        .options(joinedload(Course.classroom))
+        .where(
+            Course.id == course_id,
+            Course.teacher_id == teacher.id,
+        )
     )
-    return result.scalars().all()
+
+    course = course_result.scalar_one_or_none()
+
+    if not course:
+        raise HTTPException(
+            status_code=404,
+            detail="Course not found",
+        )
+
+    sessions_result = await db.execute(
+        select(ClassSession)
+        .where(ClassSession.course_id == course_id)
+        .order_by(ClassSession.started_at.desc())
+    )
+
+    sessions = sessions_result.scalars().all()
+
+    total_sessions = len(sessions)
+
+    active_session = next(
+        (session for session in sessions if session.is_active),
+        None,
+    )
+
+    total_students_result = await db.execute(
+        select(func.count(Student.id))
+        .where(
+            Student.classroom_id == course.classroom_id
+        )
+    )
+
+    total_students = total_students_result.scalar() or 0
+    session_ids = [session.id for session in sessions]
+
+    attendance_map = {}
+
+    if session_ids:
+        attendance_result = await db.execute(
+            select(
+                AttendanceRecord.session_id,
+                func.count(AttendanceRecord.id).label(
+                    "present_count"
+                ),
+            )
+            .where(
+                AttendanceRecord.session_id.in_(session_ids)
+            )
+            .group_by(
+                AttendanceRecord.session_id
+            )
+        )
+
+    attendance_map = {
+        session_id: present_count
+        for session_id, present_count
+        in attendance_result.all()
+    }
+
+    # recent_sessions_raw = sessions[:10]
+    #
+    # attendance_map = {}
+    #
+    # if recent_sessions_raw:
+    #     recent_session_ids = [
+    #         session.id
+    #         for session in recent_sessions_raw
+    #     ]
+    #
+    #     attendance_result = await db.execute(
+    #         select(
+    #             AttendanceRecord.session_id,
+    #             func.count(AttendanceRecord.id).label(
+    #                 "present_count"
+    #             ),
+    #         )
+    #         .where(
+    #             AttendanceRecord.session_id.in_(
+    #                 recent_session_ids
+    #             )
+    #         )
+    #         .group_by(
+    #             AttendanceRecord.session_id
+    #         )
+    #     )
+    #
+    #     attendance_map = {
+    #         session_id: present_count
+    #         for session_id, present_count
+    #         in attendance_result.all()
+    #     }
+    #
+    # recent_sessions = []
+    #
+
+    all_sessions = []
+
+    for session in sessions:
+        total_present = attendance_map.get(
+            session.id,
+            0,
+        )
+
+        attendance_percentage = (
+            round(
+                (total_present / total_students) * 100,
+                2,
+            )
+            if total_students > 0
+            else 0
+        )
+
+        all_sessions.append(
+            CourseSessionStats(
+                id=session.id,
+                title=session.title,
+                started_at=session.started_at,
+
+                total_present=total_present,
+                total_students=total_students,
+                attendance_percentage=attendance_percentage,
+            )
+        )
+    # for session in recent_sessions_raw:
+    #     total_present = attendance_map.get(
+    #         session.id,
+    #         0,
+    #     )
+    #
+    #     total_absent = max(
+    #         total_students - total_present,
+    #         0,
+    #     )
+    #
+    #     attendance_percentage = (
+    #         round(
+    #             (total_present / total_students)
+    #             * 100,
+    #             2,
+    #         )
+    #         if total_students > 0
+    #         else 0
+    #     )
+    #
+    #     recent_sessions.append(
+    #         CourseSessionStats(
+    #             id=session.id,
+    #             title=session.title,
+    #             started_at=session.started_at,
+    #
+    #             total_present=total_present,
+    #             total_students=total_students,
+    #             attendance_percentage=attendance_percentage,
+    #         )
+    #     )
+
+    return TeacherCourseDetailResponse(
+        id=course.id,
+        course_code=course.course_code,
+        course_name=course.course_name,
+
+        classroom_id=course.classroom.id,
+        classroom_name=course.classroom.name,
+
+        total_sessions=total_sessions,
+
+        active_session=active_session,
+        all_sessions = all_sessions
+
+        # recent_sessions=recent_sessions,
+    )

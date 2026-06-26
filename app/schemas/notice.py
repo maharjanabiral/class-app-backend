@@ -18,3 +18,7 @@ class NoticeResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UnreadNoticeCountResponse(BaseModel):
+    count: int

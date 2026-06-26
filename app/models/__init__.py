@@ -6,6 +6,8 @@ from app.models.teacher import Teacher
 from app.models.course import Course
 from app.models.class_session import ClassSession
 from app.models.attendance_record import AttendanceRecord
+from app.models.session_participant import SessionParticipant
+from app.models.notice_read import NoticeRead
 from app.models.note import Note
 
 __all__ = [
@@ -18,6 +20,8 @@ __all__ = [
     "Course",
     "ClassSession",
     "AttendanceRecord",
-    "Note"
+    "Note",
+    "SessionParticipant",
+    "NoticeRead"
 ]
 

@@ -9,22 +9,56 @@ from app.models.user import User
 from app.schemas.notice import NoticeCreate, NoticeResponse
 from app.dependencies import get_current_admin, get_current_user
 from app.services.websocket import manager
+from app.services.websocket_auth import get_websocket_user
+from app.models.notice_read import NoticeRead
+from app.schemas.notice import UnreadNoticeCountResponse
+from sqlalchemy import func
 
 router = APIRouter(prefix="/notices", tags=["Notices"])
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
-
 # ─── WebSocket: clients connect here to receive notices ──────────────────────
 
-@router.websocket("/ws/{role}")
-async def notice_websocket(websocket: WebSocket, role: str):
-    await manager.connect(websocket, role)
+# @router.websocket("/ws/{role}")
+# async def notice_websocket(websocket: WebSocket, role: str):
+#     await manager.connect(websocket, role)
+#     try:
+#         while True:
+#             await websocket.receive_text()  # keep connection alive
+#     except WebSocketDisconnect:
+#         manager.disconnect(websocket, role)
+
+@router.websocket("/ws")
+async def notice_websocket(
+    websocket: WebSocket,
+    db: DBSession,
+):
+
+    user = await get_websocket_user(
+        websocket,
+        db,
+    )
+
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+    role = user.role.value
+
+    await manager.connect(
+        websocket,
+        role,
+    )
+
     try:
         while True:
-            await websocket.receive_text()  # keep connection alive
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, role)
+            await websocket.receive_text()
 
+    except WebSocketDisconnect:
+        manager.disconnect(
+            websocket,
+            role,
+        )
 
 # ─── ADMIN: Create and broadcast a notice ────────────────────────────────────
 
@@ -110,3 +144,53 @@ async def delete_notice(
         raise HTTPException(status_code=404, detail="Notice not found")
     await db.delete(notice)
     await db.commit()
+
+
+@router.get(
+    "/unread-count",
+    response_model=UnreadNoticeCountResponse,
+)
+async def get_unread_notice_count(
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(func.count(Notice.id))
+        .outerjoin(
+            NoticeRead,
+            (NoticeRead.notice_id == Notice.id)
+            & (NoticeRead.user_id == current_user.id),
+        )
+        .where(
+            Notice.is_active.is_(True),
+            Notice.target_role == current_user.role,
+            NoticeRead.id.is_(None),
+        )
+    )
+
+    count = result.scalar() or 0
+
+    return UnreadNoticeCountResponse(
+        count=count
+    )
+
+
+@router.get(
+    "/my",
+    response_model=List[NoticeResponse],
+    summary="Get notices for the current user",
+)
+async def get_my_notices(
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Notice)
+        .where(
+            Notice.is_active.is_(True),
+            Notice.target_role == current_user.role,
+        )
+        .order_by(Notice.created_at.desc())
+    )
+
+    return result.scalars().all()

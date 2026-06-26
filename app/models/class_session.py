@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -13,6 +13,9 @@ class ClassSession(Base):
         nullable=False
     )
     title = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     course = relationship("Course", back_populates="sessions")
@@ -21,3 +24,5 @@ class ClassSession(Base):
         back_populates="session",
         cascade="all, delete-orphan"
     )
+
+    participants = relationship("SessionParticipant", back_populates="session", cascade="all, delete-orphan")

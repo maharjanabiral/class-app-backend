@@ -50,6 +50,7 @@ async def create_student(db: AsyncSession, data: StudentCreate) -> dict:
     await db.commit()
     await db.refresh(student)
     await db.refresh(user)  # ensure user fields are loaded after commit
+    print(default_password)
 
     return {
         "student_id": login_id,

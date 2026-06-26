@@ -27,6 +27,7 @@ class Student(Base):
     user = relationship("User", back_populates="student")
 
     classroom = relationship("Classroom", back_populates="students")
+    participants = relationship("SessionParticipant", back_populates="student", cascade="all, delete-orphan")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -5,7 +5,7 @@ from app.database import engine, Base
 # Import all models to ensure they register on the Base metadata
 import app.models # noqa: F401
 from fastapi.security import HTTPBearer
-from app.routers import auth, admin, classroom, attendance, teacher_self, student_self, course, notice, note
+from app.routers import auth, admin, classroom, attendance, teacher_self, student_self, course, notice, note, profile
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(profile.router)
 app.include_router(admin.router)
 app.include_router(teacher_self.router, prefix="/teacher")
 app.include_router(student_self.router, prefix="/student")

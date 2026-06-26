@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from app.schemas.attendance import CourseSessionStats
 
 
 class CourseCreate(BaseModel):
@@ -48,6 +49,24 @@ class CourseDetailResponse(BaseModel):
     course_name: str
     classroom: Optional[ClassroomBrief] = None
     teacher: Optional[TeacherBrief] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TeacherCourseDetailResponse(BaseModel):
+    id: int
+    course_code: str
+    course_name: str
+
+    classroom_id: int
+    classroom_name: str
+
+    total_sessions: int
+
+    active_session: Optional[CourseSessionStats]
+    # recent_sessions: list[CourseSessionStats]
+    all_sessions: list[CourseSessionStats]
 
     class Config:
         from_attributes = True
