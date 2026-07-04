@@ -22,6 +22,8 @@ class User(Base):
 
     login_id = Column(String(50), unique=True, index=True, nullable=True)
     is_created_by_admin = Column(Boolean, default=False)
+    remember_token = Column(String(50), nullable=True, index=True)
+    remember_token_expiry = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

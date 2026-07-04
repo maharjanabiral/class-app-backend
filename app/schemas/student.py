@@ -6,7 +6,7 @@ from datetime import datetime
 class StudentCreate(BaseModel):
     name: str
     email: Optional[EmailStr] = None
-    roll_no: str
+    roll_no: Optional[str] = None
     phone: str | None = None
 
 
