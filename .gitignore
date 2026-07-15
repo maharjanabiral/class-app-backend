@@ -5,3 +5,7 @@ scratch/
 test.db
 .vscode
 uploads/
+.pytest_cache/
+*.pyc
+.coverage
+htmlcov/
