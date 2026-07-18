@@ -1,18 +1,18 @@
 import io
 import csv
-import qrcode
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import StreamingResponse
 
-from sqlalchemy import func, case
+from sqlalchemy import func 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
 from datetime import datetime, timezone
 
+from app.services import livekit_service
 from app.database import get_db
 from app.dependencies import get_current_student, get_current_staff, get_current_user
 from app.models.user import User, Role
@@ -351,12 +351,27 @@ async def join_session(session_id: int, db: DBSession, current_user: User = Depe
             SessionParticipant.student_id == student.id
         )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Already joined this session")
+    already_joined = existing.scalar_one_or_none()
 
-    db.add(SessionParticipant(session_id=session_id, student_id=student.id))
-    await db.commit()
-    return {"detail": "Joined session"}
+    if not already_joined:
+        db.add(SessionParticipant(session_id=session_id, student_id=student.id))
+        await db.commit()
+
+    response = {"detail": "Joined session" if not already_joined else "Rejoined session"}
+
+    if session.room_name:
+        creds = livekit_service.generate_student_token(
+            room_name=session.room_name,
+            user_id=current_user.id,
+            display_name=current_user.name,
+        )
+        response["livekit"] = {
+            "token": creds.token,
+            "ws_url": creds.ws_url,
+            "room_name": creds.room_name,
+        }
+
+    return response
 
 
 @router.post("/sessions/{session_id}/leave", status_code=200)
@@ -391,19 +406,19 @@ async def end_session(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-
+ 
     if current_user.role == Role.teacher:
         teacher = await _get_teacher(current_user.id, db)
         await _verify_teacher_session_access(teacher.id, session, db)
-
+ 
     if not session.is_active:
         raise HTTPException(status_code=400, detail="Session is not active")
-
+ 
     participants_result = await db.execute(
         select(SessionParticipant).where(SessionParticipant.session_id == session.id)
     )
     participants = participants_result.scalars().all()
-
+ 
     for p in participants:
         existing = await db.execute(
             select(AttendanceRecord).where(
@@ -413,7 +428,14 @@ async def end_session(
         )
         if not existing.scalar_one_or_none():
             db.add(AttendanceRecord(session_id=session.id, student_id=p.student_id))
-
+ 
+    if session.room_name:
+        try:
+            await livekit_service.delete_room(session.room_name)
+        except Exception as e:
+            print(f"[livekit] room teardown failed for session {session.id}: {e}")
+        session.room_status = "ended"
+ 
     session.is_active = False
     session.ended_at = datetime.now(timezone.utc)
     await db.commit()
@@ -437,7 +459,7 @@ async def start_attendance(
         course_result = await db.execute(select(Course).where(Course.id == course_id))
         if not course_result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Course not found")
-
+ 
     active_result = await db.execute(
         select(ClassSession).where(
             ClassSession.course_id == course_id,
@@ -446,7 +468,7 @@ async def start_attendance(
     )
     if active_result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="An attendance session is already active for this course")
-
+ 
     now = datetime.now(timezone.utc)
     session = ClassSession(
         course_id=course_id,
@@ -455,6 +477,109 @@ async def start_attendance(
         started_at=now,
     )
     db.add(session)
+    await db.flush()  # get session.id before commit so we can name the room
+ 
+    room_name = f"session-{session.id}"
+    try:
+        await livekit_service.create_room(room_name)
+    except Exception as e:
+        # Don't let a LiveKit outage block attendance tracking entirely —
+        # the session can still exist without a live room; log and continue.
+        # Swap for your logger of choice.
+        print(f"[livekit] room creation failed for session {session.id}: {e}")
+        room_name = None
+ 
+    session.room_name = room_name
+    session.room_status = "live" if room_name else "not_started"
+ 
     await db.commit()
     await db.refresh(session)
     return session
+
+
+
+# ─── NEW: teacher join endpoint (admin grants, doesn't touch attendance) ─────
+ 
+@router.post("/sessions/{session_id}/join-as-host", status_code=200)
+async def join_session_as_host(
+    session_id: int, db: DBSession, current_user: User = Depends(get_current_staff)
+):
+    result = await db.execute(select(ClassSession).where(ClassSession.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+ 
+    if current_user.role == Role.teacher:
+        teacher = await _get_teacher(current_user.id, db)
+        await _verify_teacher_session_access(teacher.id, session, db)
+ 
+    if not session.room_name:
+        raise HTTPException(status_code=400, detail="This session has no live room")
+ 
+    creds = livekit_service.generate_teacher_token(
+        room_name=session.room_name,
+        user_id=current_user.id,
+        display_name=current_user.name,
+    )
+    return {"livekit": {"token": creds.token, "ws_url": creds.ws_url, "room_name": creds.room_name}}
+
+
+@router.post("/livekit/webhook", include_in_schema=False)
+async def livekit_webhook(request: Request, db: DBSession):
+    body = await request.body()
+    auth_header = request.headers.get("Authorization", "")
+ 
+    receiver = lk_api.WebhookReceiver(
+        livekit_service.LIVEKIT_API_KEY, livekit_service.LIVEKIT_API_SECRET
+    )
+    try:
+        event = receiver.receive(body, auth_header)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+ 
+    room_name = event.room.name if event.room else None
+    if not room_name or not room_name.startswith("session-"):
+        return {"ok": True}  # not one of ours
+ 
+    try:
+        session_id = int(room_name.removeprefix("session-"))
+    except ValueError:
+        return {"ok": True}
+ 
+    session_result = await db.execute(select(ClassSession).where(ClassSession.id == session_id))
+    session = session_result.scalar_one_or_none()
+    if not session:
+        return {"ok": True}
+ 
+    identity = event.participant.identity if event.participant else None
+    if not identity:
+        return {"ok": True}
+ 
+    try:
+        user_id = int(identity)
+    except ValueError:
+        return {"ok": True}
+ 
+    if event.event == "participant_joined":
+        student_result = await db.execute(select(Student).where(Student.user_id == user_id))
+        student = student_result.scalar_one_or_none()
+        if student:
+            existing = await db.execute(
+                select(SessionParticipant).where(
+                    SessionParticipant.session_id == session.id,
+                    SessionParticipant.student_id == student.id,
+                )
+            )
+            if not existing.scalar_one_or_none():
+                db.add(SessionParticipant(session_id=session.id, student_id=student.id))
+                await db.commit()
+ 
+    elif event.event == "egress_ended":
+        # Recording finished — event.egress_info has the file location
+        if event.egress_info and event.egress_info.file_results:
+            file_result = event.egress_info.file_results[0]
+            session.recording_url = file_result.location
+            session.recording_status = "completed"
+            await db.commit()
+ 
+    return {"ok": True}
