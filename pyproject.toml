@@ -21,6 +21,7 @@ dependencies = [
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
     "httpx>=0.28.1",
+    "cloudinary>=1.45.0",
 ]
 
 [tool.pyrefly]

@@ -40,3 +40,9 @@ class User(Base):
                 uselist=False,
                 cascade="all, delete-orphan"
             )
+
+    submissions = relationship(
+                    "Submission",
+                    back_populates="student",
+                    cascade="all, delete-orphan"
+    )

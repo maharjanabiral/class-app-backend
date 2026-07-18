@@ -22,11 +22,12 @@ from app.models.class_session import ClassSession
 from app.models.attendance_record import AttendanceRecord
 from app.models.user import User
 from app.schemas.course import CourseDetailResponse, TeacherBrief, ClassroomBrief, TeacherCourseDetailResponse
-from app.schemas.classroom import ClassroomResponse, StudentInClassroom
+from app.schemas.classroom import ClassroomResponse, StudentInClassroom, ClassroomDetail, CourseInClassroom
 from app.schemas.attendance import CourseSessionStats
 from app.models.student import Student
 
 router = APIRouter(prefix="/me", tags=["Teacher - Self Service"])
+
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -153,6 +154,81 @@ async def get_my_classroom_students(
         )
         for student in students
     ]#
+
+@router.get(
+    "/classroom/{classroom_id}",
+    response_model=ClassroomDetail,
+    summary="Get full detail for one of the teacher's classrooms, including its courses and students",
+)
+async def get_my_classroom_detail(
+    classroom_id: int,
+    db: DBSession,
+    current_user: User = Depends(get_current_teacher),
+):
+    teacher = await _get_teacher(current_user, db)
+
+    # Verify teacher teaches at least one course in this classroom
+    course_check = await db.execute(
+        select(Course).where(
+            Course.classroom_id == classroom_id,
+            Course.teacher_id == teacher.id,
+        )
+    )
+    if course_check.first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not teach any course in this classroom",
+        )
+
+    classroom = await db.get(Classroom, classroom_id)
+    if not classroom:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
+
+    # All courses in this classroom (not just this teacher's — students may want the full picture,
+    # but here we're on the teacher's own view so showing all courses run in this classroom is fine)
+    courses_result = await db.execute(
+        select(Course)
+        .options(joinedload(Course.teacher).joinedload(Teacher.user))
+        .where(Course.classroom_id == classroom_id)
+    )
+    courses = courses_result.scalars().unique().all()
+
+    students_result = await db.execute(
+        select(Student)
+        .options(joinedload(Student.user))
+        .where(Student.classroom_id == classroom_id)
+    )
+    students = students_result.scalars().all()
+
+    return ClassroomDetail(
+        id=classroom.id,
+        name=classroom.name,
+        section=classroom.section,
+        academic_year=classroom.academic_year,
+        students=[
+            StudentInClassroom(
+                id=s.id,
+                student_id=s.student_id,
+                roll_no=s.roll_no,
+                name=s.user.name,
+                email=s.user.email,
+                is_active=s.user.is_active,
+            )
+            for s in students
+        ],
+        courses=[
+            CourseInClassroom(
+                id=c.id,
+                course_code=c.course_code,
+                course_name=c.course_name,
+                teacher_name=c.teacher.user.name if c.teacher else None,
+            )
+            for c in courses
+        ],
+    )
+
+
+
 # @router.get(
 #     "/courses/{course_id}/sessions",
 #     response_model=List[ClassSessionResponse],

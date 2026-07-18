@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     MAIL_SERVER: str
     MAIL_STARTTLS: bool
     MAIL_SSL_TLS: bool
+    CLOUDINARY_CLOUD_NAME: str
+    CLOUDINARY_API_KEY: str
+    CLOUDINARY_API_SECRET: str
 
     class Config:
         env_file = ".env"

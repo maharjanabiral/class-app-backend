@@ -9,6 +9,7 @@ from app.models.attendance_record import AttendanceRecord
 from app.models.session_participant import SessionParticipant
 from app.models.notice_read import NoticeRead
 from app.models.note import Note
+from app.models.assignment import Assignment, Submission
 
 __all__ = [
     "Base",
@@ -23,5 +24,7 @@ __all__ = [
     "Note",
     "SessionParticipant",
     "NoticeRead"
+    "Assignment"
+    "Submission"
 ]
 
