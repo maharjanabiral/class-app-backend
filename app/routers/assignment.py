@@ -11,7 +11,7 @@ from app.models.user import User
 from app.models.course import Course
 from app.models.assignment import Assignment, Submission
 from app.schemas.assignment import (
-    AssignmentCreate, AssignmentUpdate, AssignmentOut,
+    AssignmentBase, AssignmentCreate, AssignmentUpdate, AssignmentOut,
     SubmissionCreate, SubmissionOut, SubmissionGrade, SubmissionWithStudent
 )
 from app.core.cloudinary import upload_file, delete_file
@@ -43,7 +43,7 @@ async def get_assignment_or_404(assignment_id: int, db: AsyncSession) -> Assignm
 @router.post("", response_model=AssignmentOut, status_code=status.HTTP_201_CREATED)
 async def create_assignment(
     course_id: int,
-    payload: AssignmentCreate,
+    payload: AssignmentBase,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_teacher),
 ):

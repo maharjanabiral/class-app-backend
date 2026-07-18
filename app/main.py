@@ -33,7 +33,11 @@ app.include_router(notice.router)
 app.include_router(note.router)
 app.include_router(assignment.router)
 app.include_router(assignment.submission_router)
-
+# app.include_router(course.router)
+# TODO: course.router is imported above but was never registered here — found while wiring up
+# assignment routes (15 Jul). Unclear if this is intentional or a bug; if course/classroom
+# endpoints are returning 404 in the frontend, this is likely why. Check with teammate before
+# enabling, in case course routes were deliberately moved elsewhere or merged into another router.
 
 @app.get("/")
 async def root():

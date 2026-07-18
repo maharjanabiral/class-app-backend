@@ -37,13 +37,14 @@ def save_file(file: UploadFile):
 
 # ── Teacher: upload a note to a course ───────────────────────────────────────
 @router.post(
-    "/",
+    "",
     response_model=NoteResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Upload a note to a course (Teacher only)",
 )
 async def upload_note(
     db: DBSession,
+    course_id: int = Form(...),
     title: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_teacher),
@@ -51,11 +52,13 @@ async def upload_note(
     teacher_result = await db.execute(select(Teacher).where(Teacher.user_id == current_user.id))
     teacher = teacher_result.scalar_one_or_none()
 
-    # Get the course this teacher teaches
-    course_result = await db.execute(select(Course).where(Course.teacher_id == teacher.id))
+    # Get the specific course this teacher is uploading to, and verify ownership
+    course_result = await db.execute(
+        select(Course).where(Course.id == course_id, Course.teacher_id == teacher.id)
+    )
     course = course_result.scalar_one_or_none()
     if not course:
-        raise HTTPException(status_code=404, detail="You are not assigned to any course")
+        raise HTTPException(status_code=404, detail="Course not found or not owned by you")
 
     file_path, original_filename = save_file(file)
 
