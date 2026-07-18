@@ -299,9 +299,7 @@ async def get_course_detail(
 
     total_students_result = await db.execute(
         select(func.count(Student.id))
-        .where(
-            Student.classroom_id == course.classroom_id
-        )
+        .where(Student.classroom_id == course.classroom_id)
     )
 
     total_students = total_students_result.scalar() or 0
@@ -313,73 +311,24 @@ async def get_course_detail(
         attendance_result = await db.execute(
             select(
                 AttendanceRecord.session_id,
-                func.count(AttendanceRecord.id).label(
-                    "present_count"
-                ),
+                func.count(AttendanceRecord.id).label("present_count"),
             )
-            .where(
-                AttendanceRecord.session_id.in_(session_ids)
-            )
-            .group_by(
-                AttendanceRecord.session_id
-            )
+            .where(AttendanceRecord.session_id.in_(session_ids))
+            .group_by(AttendanceRecord.session_id)
         )
 
-    attendance_map = {
-        session_id: present_count
-        for session_id, present_count
-        in attendance_result.all()
-    }
-
-    # recent_sessions_raw = sessions[:10]
-    #
-    # attendance_map = {}
-    #
-    # if recent_sessions_raw:
-    #     recent_session_ids = [
-    #         session.id
-    #         for session in recent_sessions_raw
-    #     ]
-    #
-    #     attendance_result = await db.execute(
-    #         select(
-    #             AttendanceRecord.session_id,
-    #             func.count(AttendanceRecord.id).label(
-    #                 "present_count"
-    #             ),
-    #         )
-    #         .where(
-    #             AttendanceRecord.session_id.in_(
-    #                 recent_session_ids
-    #             )
-    #         )
-    #         .group_by(
-    #             AttendanceRecord.session_id
-    #         )
-    #     )
-    #
-    #     attendance_map = {
-    #         session_id: present_count
-    #         for session_id, present_count
-    #         in attendance_result.all()
-    #     }
-    #
-    # recent_sessions = []
-    #
+        attendance_map = {
+            session_id: present_count
+            for session_id, present_count in attendance_result.all()
+        }
 
     all_sessions = []
 
     for session in sessions:
-        total_present = attendance_map.get(
-            session.id,
-            0,
-        )
+        total_present = attendance_map.get(session.id, 0)
 
         attendance_percentage = (
-            round(
-                (total_present / total_students) * 100,
-                2,
-            )
+            round((total_present / total_students) * 100, 2)
             if total_students > 0
             else 0
         )
@@ -389,57 +338,36 @@ async def get_course_detail(
                 id=session.id,
                 title=session.title,
                 started_at=session.started_at,
-
                 total_present=total_present,
                 total_students=total_students,
                 attendance_percentage=attendance_percentage,
             )
         )
-    # for session in recent_sessions_raw:
-    #     total_present = attendance_map.get(
-    #         session.id,
-    #         0,
-    #     )
-    #
-    #     total_absent = max(
-    #         total_students - total_present,
-    #         0,
-    #     )
-    #
-    #     attendance_percentage = (
-    #         round(
-    #             (total_present / total_students)
-    #             * 100,
-    #             2,
-    #         )
-    #         if total_students > 0
-    #         else 0
-    #     )
-    #
-    #     recent_sessions.append(
-    #         CourseSessionStats(
-    #             id=session.id,
-    #             title=session.title,
-    #             started_at=session.started_at,
-    #
-    #             total_present=total_present,
-    #             total_students=total_students,
-    #             attendance_percentage=attendance_percentage,
-    #         )
-    #     )
+
+    active_session_stats = None
+    if active_session:
+        total_present = attendance_map.get(active_session.id, 0)
+        attendance_percentage = (
+            round((total_present / total_students) * 100, 2)
+            if total_students > 0
+            else 0
+        )
+        active_session_stats = CourseSessionStats(
+            id=active_session.id,
+            title=active_session.title,
+            started_at=active_session.started_at,
+            total_present=total_present,
+            total_students=total_students,
+            attendance_percentage=attendance_percentage,
+        )
 
     return TeacherCourseDetailResponse(
         id=course.id,
         course_code=course.course_code,
         course_name=course.course_name,
-
         classroom_id=course.classroom.id,
         classroom_name=course.classroom.name,
-
         total_sessions=total_sessions,
-
-        active_session=active_session,
-        all_sessions = all_sessions
-
-        # recent_sessions=recent_sessions,
+        active_session=active_session_stats,
+        all_sessions=all_sessions,
     )

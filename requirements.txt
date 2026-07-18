@@ -10,3 +10,5 @@ fastapi-mail
 qrcode[pil]
 asyncpg
 python-multipart
+livekit
+livekit-api

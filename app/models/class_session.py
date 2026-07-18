@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, f
 from sqlalchemy.orm import relationship
 from app.database import Base
 
-
 class ClassSession(Base):
     __tablename__ = "class_sessions"
 
@@ -17,6 +16,15 @@ class ClassSession(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     ended_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    room_name = Column()
+
+    # --- Live meeting fields ---
+    room_name = Column(String, nullable=True, unique=True)
+    room_status = Column(String, default="not_started", nullable=False)
+    # not_started | live | ended
+    recording_url = Column(String, nullable=True)
+    recording_status = Column(String, nullable=True)
 
     course = relationship("Course", back_populates="sessions")
     attendance_records = relationship(
